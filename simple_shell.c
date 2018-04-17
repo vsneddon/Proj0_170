@@ -29,12 +29,22 @@ void handler(int sig){
     signal(SIGTSTP, quitter);
 }
 
-void executeCommand();
-void redirectHandler();
+void runcommand(char** args){
+    pid_t pid = fork();
+    if(pid) { // parent
+        waitpid(pid, NULL, 0);
+    } else { // child
+        execvp(args[0], args);
+    }
+}
 
 
 //Separate commands by pipe and run each command
 void pipeHandler(char** args){
+    char* cmd1[MAX_TOKEN_COUNT];
+    char* cmd2[MAX_TOKEN_COUNT];
+    char* cmd3[MAX_TOKEN_COUNT];
+
     int numcmds = 1;
     int z = 0;
     while(args[z] != NULL){
@@ -43,6 +53,40 @@ void pipeHandler(char** args){
         }
         z++;
     }
+
+    int cmdpos1 = 0;
+    int cmdpos2 = 0;
+    int cmdpos3 = 0;
+    int pipecount = 0;
+    z = 0;
+
+    //Add arguments to cmd lists
+    while(args[z] != NULL){
+        if(strcmp(args[z], "|") == 0){
+            pipecount++;
+        }else{
+            switch(pipecount){
+                case 0:{
+                    cmd1[cmdpos1] = args[z];
+                    cmdpos1++;
+                    break;
+                }case 1:{
+                    cmd2[cmdpos2] = args[z];
+                    cmdpos2++;
+                    break;
+                }case 2:{
+                    cmd3[cmdpos3] = args[z];
+                    cmdpos3++;
+                    break;
+                }
+            }
+        }
+        z++;
+    }
+    cmd1[cmdpos1] = NULL;
+    cmd2[cmdpos2] = NULL;
+    cmd3[cmdpos3] = NULL;
+
 
     int fd1[2];
     int fd2[2];
@@ -62,7 +106,7 @@ void pipeHandler(char** args){
                 dup2(fd2[1], 1);
                 close(fd2[0]);
             }
-            executeCommand();
+            runcommand(cmd2);
         }
 
     }else if (fork() == 0){ //Grandchild or cmd 3
@@ -73,7 +117,7 @@ void pipeHandler(char** args){
             //Read from pipe 2
             dup2(fd2[0], 0);
             close(fd2[1]);
-            executeCommand();
+            runcommand(cmd3);
         }
 
     }else{ // parent or cmd1
@@ -87,7 +131,7 @@ void pipeHandler(char** args){
                 close(fd2[0]);
                 close(fd2[1]);
             }
-            executeCommand(args);
+            runcommand(cmd1);
         }
     }
 
