@@ -35,6 +35,7 @@ void runcommand(char** args){
         waitpid(pid, NULL, 0);
     } else { // child
         execvp(args[0], args);
+        perror(args[0]);
     }
 }
 
@@ -87,7 +88,6 @@ void pipeHandler(char** args){
     cmd2[cmdpos2] = NULL;
     cmd3[cmdpos3] = NULL;
 
-
     int fd1[2];
     int fd2[2];
     pipe(fd1);
@@ -117,20 +117,24 @@ void pipeHandler(char** args){
             //Read from pipe 2
             dup2(fd2[0], 0);
             close(fd2[1]);
+
             runcommand(cmd3);
         }
 
     }else{ // parent or cmd1
         if(numcmds > 0){
+            //close pipe2 because it will never be used
+            close(fd2[0]);
+            close(fd2[1]);
+
             if(numcmds > 1){ //pipe to second cmd
                 dup2(fd1[1], 1);
                 close(fd1[0]);
             }else{ //close for no piping
                 close(fd1[0]);
                 close(fd1[1]);
-                close(fd2[0]);
-                close(fd2[1]);
             }
+
             runcommand(cmd1);
         }
     }
