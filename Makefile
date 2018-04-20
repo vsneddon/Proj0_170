@@ -1,17 +1,17 @@
 CC      = gcc
 CFLAGS  = -O
-LDFLAGS  = -O 
+LDFLAGS  = -O
 
 
-all: simple 
+all: simple
 
 simple:  simple_shell.o
-	$(CC) -o $@ $^ $(LDFLAGS)
+	$(CC) -g -o $@ $^ $(LDFLAGS)
 
-run: 
+run:
 	./simple
 
-test: 
+test:
 	./simple < testfile
 
 clean:
@@ -20,4 +20,3 @@ clean:
 
 .c.o:
 	$(CC)  $(CFLAGS) -c $<
-
