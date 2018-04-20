@@ -30,13 +30,9 @@ void handler(int sig){
 }
 
 void runcommand(char** args){
-    pid_t pid = fork();
-    if(pid) { // parent
-        waitpid(pid, NULL, 0);
-    } else { // child
-        execvp(args[0], args);
-        perror(args[0]);
-    }
+    execvp(args[0], args);
+    perror(args[0]);
+    exit(1);
 }
 
 
@@ -46,36 +42,28 @@ void pipeHandler(char** args){
     char* cmd2[MAX_TOKEN_COUNT];
     char* cmd3[MAX_TOKEN_COUNT];
 
-    int numcmds = 1;
-    int z = 0;
-    while(args[z] != NULL){
-        if(strcmp(args[z], "|") == 0){
-            numcmds++;
-        }
-        z++;
-    }
 
     int cmdpos1 = 0;
     int cmdpos2 = 0;
     int cmdpos3 = 0;
-    int pipecount = 0;
-    z = 0;
+    int numcmds = 1;
+    int z = 0;
 
     //Add arguments to cmd lists
     while(args[z] != NULL){
         if(strcmp(args[z], "|") == 0){
-            pipecount++;
+            numcmds++;
         }else{
-            switch(pipecount){
-                case 0:{
+            switch(numcmds){
+                case 1:{
                     cmd1[cmdpos1] = args[z];
                     cmdpos1++;
                     break;
-                }case 1:{
+                }case 2:{
                     cmd2[cmdpos2] = args[z];
                     cmdpos2++;
                     break;
-                }case 2:{
+                }case 3:{
                     cmd3[cmdpos3] = args[z];
                     cmdpos3++;
                     break;
@@ -93,62 +81,100 @@ void pipeHandler(char** args){
     pipe(fd1);
     pipe(fd2);
 
-    if(fork() == 0){ //Child or cmd 2
-        if(numcmds > 1){
-            //Read from command 1
-            dup2(fd1[0], 0);
-            close(fd1[1]);
-            if(numcmds == 2){ //close pipes for command 3
-                close(fd2[0]);
-                close(fd2[1]);
-            }
-            else if(numcmds == 3){
-                dup2(fd2[1], 1);
-                close(fd2[0]);
-            }
-            runcommand(cmd2);
-        }
+    if(fork() == 0){
+        if(fork()==0){//grandchild cmd1
+            if(numcmds > 0){
+                if(numcmds > 1){ //pipe to second cmd
+                    dup2(fd1[1], 1);
+                }
 
-    }else if (fork() == 0){ //Grandchild or cmd 3
-        if(numcmds == 3){
-            //Close access to pipe 1
-            close(fd1[0]);
-            close(fd1[1]);
-            //Read from pipe 2
-            dup2(fd2[0], 0);
-            close(fd2[1]);
-
-            runcommand(cmd3);
-        }
-
-    }else{ // parent or cmd1
-        if(numcmds > 0){
-            //close pipe2 because it will never be used
-            close(fd2[0]);
-            close(fd2[1]);
-
-            if(numcmds > 1){ //pipe to second cmd
-                dup2(fd1[1], 1);
-                close(fd1[0]);
-            }else{ //close for no piping
                 close(fd1[0]);
                 close(fd1[1]);
-            }
+                close(fd2[0]);
+                close(fd2[1]);
+                runcommand(cmd1);
+            } else{exit(0);}
+        }
+        else{//child
+            if(numcmds > 1){
+                //Read from command 1
+                dup2(fd1[0], 0);
+                if(numcmds == 3){
+                    dup2(fd2[1], 1);
+                }
 
-            runcommand(cmd1);
+                close(fd1[0]);
+                close(fd1[1]);
+                close(fd2[0]);
+                close(fd2[1]);
+                runcommand(cmd2);
+            }else{exit(0);}
+
         }
     }
+    else{ //parent or cmd 3
+        if(numcmds == 3){
+            //Read from pipe 2
+            dup2(fd2[0], 0);
 
+            close(fd1[0]);
+            close(fd1[1]);
+            close(fd2[0]);
+            close(fd2[1]);
+            runcommand(cmd3);
+        }else{exit(0);}
+    }
+
+    // if(fork() == 0){
+    //     //command 1
+    //     dup2(fd1[1], 1);
+    //
+    //     close(fd1[0]);
+    //     close(fd1[1]);
+    //     close(fd2[0]);
+    //     close(fd2[1]);
+    //
+    //     runcommand(cmd1);
+    //
+    // }else{
+    //     if(fork() == 0){
+    //         //command2
+    //         dup2(fd1[0], 0);
+    //         dup2(fd2[1], 1);
+    //
+    //         close(fd1[0]);
+    //         close(fd1[1]);
+    //         close(fd2[0]);
+    //         close(fd2[1]);
+    //         runcommand(cmd2);
+    //
+    //     }else{
+    //         if(fork() == 0){
+    //             //command 3
+    //             dup2(fd2[0], 0);
+    //
+    //             close(fd1[0]);
+    //             close(fd1[1]);
+    //             close(fd2[0]);
+    //             close(fd2[1]);
+    //             runcommand(cmd3);
+    //         }
+    //     }
+    // }
+    // close(fd1[0]);
+    // close(fd1[1]);
+    // close(fd2[0]);
+    // close(fd2[1]);
+    // waitpid(-1, NULL, 0);
+    // exit(0);
 }
 
 
-//Split process into parent, and child where child executes commands
-void runcommands(char** args) {
+void runCommands(char** args){
     pid_t pid = fork();
     if(pid) { // parent
         waitpid(pid, NULL, 0);
     } else { // child
-        //execvp(command, args);
         pipeHandler(args);
     }
 }
@@ -174,7 +200,7 @@ int main(){
 
         if(argument_count>0) {
             if (strcmp(arguments[0], "exit") == 0) exit(0);
-            runcommands(arguments);
+            runCommands(arguments);
         }
         //printf("shell: ");
     }
