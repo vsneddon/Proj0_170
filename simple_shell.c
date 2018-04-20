@@ -1,4 +1,6 @@
+//CS170 Project 0 by Ryan Kirkpatrick and Victoria Sneddon
 #include <signal.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -22,21 +24,88 @@
  *   shell: exit
  **/
 
+//Second handler for the signal to quit program on second Ctrl-Z
 void signalQuitter(){
     exit(0);
 }
+//First signal handler to switch Ctrl-Z signal to run signalQuitter
 void signalHandler(int sig){
     signal(SIGTSTP, signalQuitter);
 }
 
+//Basic run command function for replacing a process and executing
 void runcommand(char** args){
     execvp(args[0], args);
     perror(args[0]);
     exit(1);
 }
 
+//connects a file as input to a cmd.
+//cmdargs is the tokens of the full command
+//inputPos is the position of a < in cmdargs
+void redirectInput(char** cmdargs, int inputPos){
+    if(inputPos != -2){
+        char* filename;
+        filename = cmdargs[inputPos + 1];
+
+        int fd = open(filename, O_RDONLY);
+        if(fd < 0){exit(1);}
+
+        dup2(fd, 0);
+        close(fd);
+    }
+}
+
+//connects a file as output to a cmd.
+//cmdargs is the tokens of the full command
+//outputPos is the position of a > in cmdargs
+void redirectOutput(char** cmdargs, int outputPos){
+    if(outputPos != -2){
+        char* filename;
+        filename = cmdargs[outputPos + 1];
+
+        int fd = open(filename, O_WRONLY | O_CREAT, 0666);
+        if(fd < 0){exit(1);}
+
+        dup2(fd, 1);
+        close(fd);
+    }
+}
+
+//Handles input and output redirection of a full command
+//cmdargs are the tokens of the full command
+void redirectHandler(char** cmdargs){
+    char* args[MAX_TOKEN_COUNT];
+
+    //Find the positions of the < and > in the cmdargs
+    //And remove them and the filename from cmdargs and place into args
+    int inputPos  = -2;
+    int outputPos = -2;
+    int i = 0;
+    int z = 0;
+    while(cmdargs[z] != NULL){
+        if      (strcmp(cmdargs[z], "<") == 0){
+            inputPos  = z;
+            z = z + 2;
+        }else if(strcmp(cmdargs[z], ">") == 0){
+            outputPos = z;
+            z = z + 2;
+        }else{
+            args[i] = cmdargs[z];
+            i++;
+            z++;
+        }
+    }
+    args[i] = NULL;
+
+    redirectInput(cmdargs, inputPos);
+    redirectOutput(cmdargs, outputPos);
+    runcommand(args);
+
+}
 
 //Separate commands by pipe and run each command
+//args is the arguments of all commands
 void pipeHandler(char** args){
     char* cmd1[MAX_TOKEN_COUNT];
     char* cmd2[MAX_TOKEN_COUNT];
@@ -91,7 +160,7 @@ void pipeHandler(char** args){
             close(fd1[1]);
             close(fd2[0]);
             close(fd2[1]);
-            runcommand(cmd1);
+            redirectHandler(cmd1);
         } else{exit(0);}
     }
     else if(fork() == 0){//child2 cmd 2
@@ -106,7 +175,7 @@ void pipeHandler(char** args){
             close(fd1[1]);
             close(fd2[0]);
             close(fd2[1]);
-            runcommand(cmd2);
+            redirectHandler(cmd2);
         }else{exit(0);}
 
     }
@@ -119,55 +188,12 @@ void pipeHandler(char** args){
             close(fd1[1]);
             close(fd2[0]);
             close(fd2[1]);
-            runcommand(cmd3);
+            redirectHandler(cmd3);
         }else{exit(0);}
     }
-
-    // if(fork() == 0){
-    //     //command 1
-    //     dup2(fd1[1], 1);
-    //
-    //     close(fd1[0]);
-    //     close(fd1[1]);
-    //     close(fd2[0]);
-    //     close(fd2[1]);
-    //
-    //     runcommand(cmd1);
-    //
-    // }else{
-    //     if(fork() == 0){
-    //         //command2
-    //         dup2(fd1[0], 0);
-    //         dup2(fd2[1], 1);
-    //
-    //         close(fd1[0]);
-    //         close(fd1[1]);
-    //         close(fd2[0]);
-    //         close(fd2[1]);
-    //         runcommand(cmd2);
-    //
-    //     }else{
-    //         if(fork() == 0){
-    //             //command 3
-    //             dup2(fd2[0], 0);
-    //
-    //             close(fd1[0]);
-    //             close(fd1[1]);
-    //             close(fd2[0]);
-    //             close(fd2[1]);
-    //             runcommand(cmd3);
-    //         }
-    //     }
-    // }
-    // close(fd1[0]);
-    // close(fd1[1]);
-    // close(fd2[0]);
-    // close(fd2[1]);
-    // waitpid(-1, NULL, 0);
-    // exit(0);
 }
 
-
+//creates child process to run the commands
 void runCommands(char** args){
     pid_t pid = fork();
     if(pid) { // parent
