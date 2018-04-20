@@ -22,11 +22,11 @@
  *   shell: exit
  **/
 
-void quitter(){
+void signalQuitter(){
     exit(0);
 }
-void handler(int sig){
-    signal(SIGTSTP, quitter);
+void signalHandler(int sig){
+    signal(SIGTSTP, signalQuitter);
 }
 
 void runcommand(char** args){
@@ -181,7 +181,7 @@ int main(){
     char line[MAX_LINE_LENGTH];
     //printf("shell: ");
 
-    signal(SIGTSTP, handler);
+    signal(SIGTSTP, signalHandler);
     while(fgets(line, MAX_LINE_LENGTH, stdin)) {
         // Build the command and arguments, using execv conventions.
         line[strlen(line)-1] = '\0'; // get rid of the new line
