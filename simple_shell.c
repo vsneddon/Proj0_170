@@ -81,36 +81,34 @@ void pipeHandler(char** args){
     pipe(fd1);
     pipe(fd2);
 
-    if(fork() == 0){
-        if(fork()==0){//grandchild cmd1
-            if(numcmds > 0){
-                if(numcmds > 1){ //pipe to second cmd
-                    dup2(fd1[1], 1);
-                }
+    if(fork() == 0){//child1 cmd1
+        if(numcmds > 0){
+            if(numcmds > 1){ //pipe to second cmd
+                dup2(fd1[1], 1);
+            }
 
-                close(fd1[0]);
-                close(fd1[1]);
-                close(fd2[0]);
-                close(fd2[1]);
-                runcommand(cmd1);
-            } else{exit(0);}
-        }
-        else{//child
-            if(numcmds > 1){
-                //Read from command 1
-                dup2(fd1[0], 0);
-                if(numcmds == 3){
-                    dup2(fd2[1], 1);
-                }
+            close(fd1[0]);
+            close(fd1[1]);
+            close(fd2[0]);
+            close(fd2[1]);
+            runcommand(cmd1);
+        } else{exit(0);}
+    }
+    else if(fork() == 0){//child2 cmd 2
+        if(numcmds > 1){
+            //Read from command 1
+            dup2(fd1[0], 0);
+            if(numcmds == 3){
+                dup2(fd2[1], 1);
+            }
 
-                close(fd1[0]);
-                close(fd1[1]);
-                close(fd2[0]);
-                close(fd2[1]);
-                runcommand(cmd2);
-            }else{exit(0);}
+            close(fd1[0]);
+            close(fd1[1]);
+            close(fd2[0]);
+            close(fd2[1]);
+            runcommand(cmd2);
+        }else{exit(0);}
 
-        }
     }
     else{ //parent or cmd 3
         if(numcmds == 3){
