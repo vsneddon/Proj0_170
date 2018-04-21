@@ -1,0 +1,6 @@
+ls -l -f
+ls -l
+sort Makefile 
+wc Makefile  
+exit
+
