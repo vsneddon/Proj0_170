@@ -206,6 +206,7 @@ void runCommands(char** args){
     pid_t pid = fork();
     if(pid) { // parent
         waitpid(pid, NULL, 0);
+        usleep(2500);
     } else { // child
         // int z = 0;
         // while(args[z] != NULL){
